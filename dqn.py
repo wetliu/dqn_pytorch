@@ -4,6 +4,7 @@ import random
 import numpy as np
 import os
 from collections import deque
+from datetime import datetime
 
 import torch
 import torch.nn as nn
@@ -20,7 +21,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # if gpu i
 fp = m.FrameProcessor()
 
 # 3. environment reset
-env = gym.envs.make('BreakoutDeterministic-v4')
+env_name = 'BreakoutDeterministic-v4'
+env = gym.envs.make(env_name)
 #env = gym.envs.make('MontezumaRevengeDeterministic-v4')
 lives = env.unwrapped.ale.lives() + 1
 c,h,w = fp.process(env.reset()).shape
@@ -43,6 +45,7 @@ TARGET_UPDATE = 10000
 NUM_STEPS = 50000000
 M_SIZE = 1000000
 POLICY_UPDATE = 4
+EVALUATE_FREQ = 500000
 optimizer = optim.Adam(policy_net.parameters(), lr=1e-5)
 
 # replay memory and action selector
@@ -71,6 +74,33 @@ def optimize_model(train):
     for param in policy_net.parameters():
         param.grad.data.clamp_(-1, 1)
     optimizer.step()
+
+def evaluate(step, policy_net, fp, device, env_name, n_actions, eps=0.05, num_episode=5):
+    env = gym.envs.make(env_name)
+    sa = m.ActionSelector(0.05, 0.05, policy_net, EPS_DECAY, n_actions, device)
+    e_rewards = []
+    q = deque(maxlen=5)
+    for i in range(num_episode):
+        env.reset()
+        e_reward = 0
+        for _ in range(10): # no-op
+            img, _, done, _ = env.step(0)
+            n_frame = fp.process(img)
+            q.append(n_frame)
+
+        while not done:
+            state = torch.cat(list(q))[1:].unsqueeze(0)
+            action, eps = sa.select_action(state, train)
+            img, reward, done, info = env.step(action)
+            n_frame = fp.process(img)
+            q.append(n_frame)
+            
+            e_reward += reward
+        e_rewards.append(e_reward)
+
+    f = open("file.txt",'a') 
+    f.write("%f, %d, %d\n" % (float(sum(e_rewards))/float(num_episode), step, num_episode))
+    f.close()
 
 q = deque(maxlen=5)
 done = True
@@ -115,3 +145,8 @@ for step in range(NUM_STEPS):
     # Update the target network, copying all weights and biases in DQN
     if step % TARGET_UPDATE == 0:
         target_net.load_state_dict(policy_net.state_dict())
+    
+    if step % EVALUATE_FREQ == 0:
+        evaluate(step, policy_net, fp, device, env_name, n_actions, eps=0.05, num_episode=30)
+
+
