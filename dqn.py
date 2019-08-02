@@ -45,8 +45,8 @@ TARGET_UPDATE = 10000
 NUM_STEPS = 50000000
 M_SIZE = 1000000
 POLICY_UPDATE = 4
-EVALUATE_FREQ = 500000
-optimizer = optim.Adam(policy_net.parameters(), lr=1e-5)
+EVALUATE_FREQ = 200000
+optimizer = optim.Adam(policy_net.parameters(), lr=0.0000625, eps=1.5e-4)
 
 # replay memory and action selector
 memory = m.ReplayMemory(M_SIZE, [5,h,w], n_actions, device)
@@ -147,6 +147,6 @@ for step in range(NUM_STEPS):
         target_net.load_state_dict(policy_net.state_dict())
     
     if step % EVALUATE_FREQ == 0:
-        evaluate(step, policy_net, fp, device, env_name, n_actions, eps=0.05, num_episode=30)
+        evaluate(step, policy_net, fp, device, env_name, n_actions, eps=0.05, num_episode=15)
 
 

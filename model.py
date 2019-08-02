@@ -106,7 +106,7 @@ class FrameProcessor():
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         frame = frame[46:160+46, :]
 
-        frame = cv2.resize(frame, (im_size, im_size), interpolation=cv2.INTER_NEAREST)
+        frame = cv2.resize(frame, (im_size, im_size), interpolation=cv2.INTER_LINEAR)
         frame = frame.reshape((1, im_size, im_size))
 
         x = torch.from_numpy(frame)
