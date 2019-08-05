@@ -1,10 +1,10 @@
-import gym
 import math
 import random
 import numpy as np
 import os
 from collections import deque
 from datetime import datetime
+from tqdm import tqdm
 
 import torch
 import torch.nn as nn
@@ -12,20 +12,19 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 import model as m
+from atari_wrappers import wrap_deepmind, make_atari
 
 # 1. GPU settings
 os.environ['CUDA_VISIBLE_DEVICES'] = '1' 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # if gpu is to be used
 
-# 2. FrameProcessor
-fp = m.FrameProcessor()
-
 # 3. environment reset
-env_name = 'BreakoutDeterministic-v4'
-env = gym.envs.make(env_name)
-#env = gym.envs.make('MontezumaRevengeDeterministic-v4')
-lives = env.unwrapped.ale.lives() + 1
-c,h,w = fp.process(env.reset()).shape
+env_name = 'Breakout'
+#env_name = 'SpaceInvadersDeterministic-v4'
+env_raw = make_atari('{}NoFrameskip-v4'.format(env_name))
+env = wrap_deepmind(env_raw, frame_stack=False, episode_life=True, clip_rewards=True)
+
+c,h,w = m.fp(env.reset()).shape
 n_actions = 4
 
 # 4. Network reset
@@ -75,8 +74,8 @@ def optimize_model(train):
         param.grad.data.clamp_(-1, 1)
     optimizer.step()
 
-def evaluate(step, policy_net, fp, device, env_name, n_actions, eps=0.05, num_episode=5):
-    env = gym.envs.make(env_name)
+def evaluate(step, policy_net, device, env, n_actions, eps=0.05, num_episode=5):
+    env = wrap_deepmind(env)
     sa = m.ActionSelector(0.05, 0.05, policy_net, EPS_DECAY, n_actions, device)
     e_rewards = []
     q = deque(maxlen=5)
@@ -84,15 +83,15 @@ def evaluate(step, policy_net, fp, device, env_name, n_actions, eps=0.05, num_ep
         env.reset()
         e_reward = 0
         for _ in range(10): # no-op
-            img, _, done, _ = env.step(0)
-            n_frame = fp.process(img)
+            n_frame, _, done, _ = env.step(0)
+            n_frame = m.fp(n_frame)
             q.append(n_frame)
 
         while not done:
             state = torch.cat(list(q))[1:].unsqueeze(0)
             action, eps = sa.select_action(state, train)
-            img, reward, done, info = env.step(action)
-            n_frame = fp.process(img)
+            n_frame, reward, done, info = env.step(action)
+            n_frame = m.fp(n_frame)
             q.append(n_frame)
             
             e_reward += reward
@@ -105,37 +104,30 @@ def evaluate(step, policy_net, fp, device, env_name, n_actions, eps=0.05, num_ep
 q = deque(maxlen=5)
 done = True
 eps = 0
-sum_reward = 0
 episode_len = 0
-for step in range(NUM_STEPS):
+
+progressive = tqdm(range(NUM_STEPS), total=NUM_STEPS, ncols=50, leave=False, unit='b')
+for step in progressive:
     if done: # life reset !!!
         env.reset()
-        lives = env.unwrapped.ale.lives()
-        print('%d (%d), reward: %d, eps: %.3f, episode len: %d' % (step, len(memory), sum_reward, eps, episode_len))
         sum_reward = 0
         episode_len = 0
         img, _, _, _ = env.step(1) # BREAKOUT specific !!!
         for i in range(10): # no-op
-            img, _, _, _ = env.step(0)
-            n_frame = fp.process(img)
+            n_frame, _, _, _ = env.step(0)
+            n_frame = m.fp(n_frame)
             q.append(n_frame)
         
     train = len(memory) > 50000
     # Select and perform an action
     state = torch.cat(list(q))[1:].unsqueeze(0)
     action, eps = sa.select_action(state, train)
-    img, reward, done, info = env.step(action)
-    # reward
-    sum_reward += reward
-        
-    reward = min(max(-1,reward), 1) # reward clipping !!!
+    n_frame, reward, done, info = env.step(action)
+    n_frame = m.fp(n_frame)
 
     # 5 frame as memory
-    n_frame = fp.process(img)
     q.append(n_frame)
-    memory.push(torch.cat(list(q)).unsqueeze(0), action, reward, done or lives > env.unwrapped.ale.lives()) # here the n_frame means next frame from the previous time step
-    if lives > env.unwrapped.ale.lives(): # env changed
-        lives = env.unwrapped.ale.lives()
+    memory.push(torch.cat(list(q)).unsqueeze(0), action, reward, done) # here the n_frame means next frame from the previous time step
     episode_len += 1
 
     # Perform one step of the optimization (on the target network)
@@ -147,6 +139,6 @@ for step in range(NUM_STEPS):
         target_net.load_state_dict(policy_net.state_dict())
     
     if step % EVALUATE_FREQ == 0:
-        evaluate(step, policy_net, fp, device, env_name, n_actions, eps=0.05, num_episode=15)
+        evaluate(step, policy_net, device, env_raw, n_actions, eps=0.05, num_episode=15)
 
 

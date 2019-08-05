@@ -97,6 +97,11 @@ class ReplayMemory(object):
     def __len__(self):
         return self.size
 
+def fp(n_frame):
+    n_frame = torch.from_numpy(n_frame)
+    h = n_frame.shape[-2]
+    return n_frame.view(1,h,h)
+
 class FrameProcessor():
     def __init__(self, im_size=84):
         self.im_size = im_size
