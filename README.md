@@ -10,8 +10,9 @@ You are able to change the env in dqn.py
 
 ## Benchmark Results
 Testing score is calculated by averaging 15 testing episodes every 200,000 training steps.
- Env | Best testing score | # of training steps when best score reached
+
 :--:|:--:|:--:
+ Env | Best testing score | # of training steps when best score reached
 Breakout | 403.666667 | 19000000 (19M)
 SpaceInvaders | 1996.333333 | 11600000 (~12M)
 
