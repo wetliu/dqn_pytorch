@@ -15,6 +15,7 @@ Testing score is calculated by averaging 15 testing episodes every 200,000 train
 :--:|:--:|:--:
  Breakout | 403.666667 | 19000000 (19M)
  SpaceInvaders | 1996.333333 | 11600000 (~12M)
+ Seaquest | 7274.666667 | 8600000 (8.6M)
 
 ## Requirements
 
