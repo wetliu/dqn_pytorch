@@ -19,13 +19,17 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # if gpu is to be used
 
 # 3. environment reset
-env_name = 'Breakout'
-#env_name = 'SpaceInvadersDeterministic-v4'
+#env_name = 'Breakout'
+#env_name = 'SpaceInvaders'
+env_name = 'Riverraid'
+#env_name = 'Seaquest'
+#env_name = 'MontezumaRevenge'
 env_raw = make_atari('{}NoFrameskip-v4'.format(env_name))
 env = wrap_deepmind(env_raw, frame_stack=False, episode_life=True, clip_rewards=True)
 
 c,h,w = m.fp(env.reset()).shape
-n_actions = 4
+n_actions = env.action_space.n
+print(n_actions)
 
 # 4. Network reset
 policy_net = m.DQN(h, w, n_actions, device).to(device)
@@ -76,7 +80,7 @@ def optimize_model(train):
 
 def evaluate(step, policy_net, device, env, n_actions, eps=0.05, num_episode=5):
     env = wrap_deepmind(env)
-    sa = m.ActionSelector(0.05, 0.05, policy_net, EPS_DECAY, n_actions, device)
+    sa = m.ActionSelector(eps, eps, policy_net, EPS_DECAY, n_actions, device)
     e_rewards = []
     q = deque(maxlen=5)
     for i in range(num_episode):

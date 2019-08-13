@@ -84,9 +84,7 @@ class ReplayMemory(object):
         self.size = max(self.size, self.position)
 
     def sample(self, bs):
-        if self.size-5 < bs:
-            raise ValueError('ReplayMemory: replay size %d < batch size %d' % (self.size-5, bs))
-        i = torch.randint(0, high=self.size-5, size=(bs,))
+        i = torch.randint(0, high=self.size, size=(bs,))
         bs = self.m_states[i, :4] 
         bns = self.m_states[i, 1:] 
         ba = self.m_actions[i].to(self.device)
